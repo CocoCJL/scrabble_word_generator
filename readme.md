@@ -64,22 +64,18 @@ Play a full Scrabble game with automatic move validation and score calculation. 
 
 See `sample.ipynb` for usage examples.
 
-## Player Optimization Strategies 
+#### Player Optimization Strategies 
 
-Get the best next move on board from players optimising on different strategies.
+recommend the best next move based on the current board state and the given deck, based on different optimisation strategies
 
-### Player 1: Length Maximizer
-**Strategy:** Prioritize playing the longest possible words
-- Aims to use all 7 tiles for bingo bonus whenever possible
-- Focuses on maximizing tile usage per turn
+**Player 1: Length Maximizer**
+- Strategy: Prioritize playing the longest possible words
 
-### Player 2: Crossword Specialist  
-**Strategy:** Maximize the number of words formed per turn
-- Looks for opportunities to create multiple words simultaneously
+**Player 2: Crossword Specialist**
+- Strategy: Maximize the number of words formed per turn
 - Places tiles to form cross words with existing tiles
 
-### Player 3: Multiplier Optimizer
-**Strategy:** Take advantage of premium squares (DLS, TLS, DWS, TWS)
+**Player 3: Multiplier Optimizer**
+- Strategy: Take advantage of premium squares (DLS, TLS, DWS, TWS)
 - Prioritizes moves that place high-value letters on letter multipliers
 - Seeks positions that trigger multiple word multipliers
-- Balances letter value with multiplier positioning
