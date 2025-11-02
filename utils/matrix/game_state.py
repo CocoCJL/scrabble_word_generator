@@ -1,7 +1,9 @@
 from typing import List, Tuple, Optional, Set
 import numpy as np
-from numpy.typing import NDArray
 from tabulate import tabulate
+import random
+import string
+from itertools import product
 
 class Game:
     def __init__(self, rule):
@@ -213,21 +215,25 @@ class Game:
         headers = [str(c) for c in range(self.board.shape[1])]
         print(tabulate(table, headers=headers, showindex="always", tablefmt="fancy_grid"))
     
-    def _get_all_affected_words(self, additions: List[Tuple[str, List[int]]]) -> Set[str]:
+    def _extract_word_positions(self, temp_board: np.ndarray, additions: List[Tuple[str, List[int]]]) -> List[List[Tuple[int, int]]]:
         """
-        Get all words formed or modified by the new letters.
-        Returns set of main word and any cross words formed.
-        Assumes additions are valid (single line, continuous, within bounds).
-        """
-        words = set()
-        if not additions:
-            return words
+        Extract all word positions (main and cross words) formed by additions on temp_board.
+        
+        This is the efficient NumPy-based implementation used by both word extraction and scoring.
+        
+        Args:
+            temp_board: Board with additions already applied
+            additions: List of (letter, [row, col]) tuples for new letters
             
-        temp_board = self.board.copy()
+        Returns:
+            List of word position lists, where each word is represented as [(r1,c1), (r2,c2), ...]
+        """
+        if not additions:
+            return []
+            
         positions = np.array([pos for _, pos in additions])
-        for letter, [row, col] in additions:
-            temp_board[row, col] = letter
-
+        words: List[List[Tuple[int, int]]] = []
+        
         # Get the primary word (horizontal or vertical)
         unique_rows = np.unique(positions[:, 0])
         unique_cols = np.unique(positions[:, 1])
@@ -244,9 +250,9 @@ class Game:
             # Find the segment containing our new word
             for seg in occupied_segments:
                 if min_col <= seg[-1] and max_col >= seg[0]:  # Segment overlaps with additions
-                    word = ''.join(temp_board[row, seg[0]:seg[-1] + 1])
-                    if len(word) > 1:
-                        words.add(word)
+                    main_word_positions = [(row, c) for c in range(seg[0], seg[-1] + 1)]
+                    if len(main_word_positions) > 1:
+                        words.append(main_word_positions)
                     break # since we should only get one continuous word as result of our addition
                         
             # Get cross words efficiently
@@ -262,8 +268,8 @@ class Game:
                 segment_boundaries = np.split(indices, np.where(~segment_idx)[0] + 1)
                 segment = next((seg for seg in segment_boundaries if row in seg), None)
                 if segment is not None and len(segment) > 1:
-                    word = ''.join(temp_board[segment[0]:segment[-1] + 1, positions[i, 1]])
-                    words.add(word)
+                    cross_word_positions = [(r, positions[i, 1]) for r in range(segment[0], segment[-1] + 1)]
+                    words.append(cross_word_positions)
                             
         else:  # Vertical word
             col = unique_cols[0]
@@ -277,9 +283,9 @@ class Game:
             # Find the segment containing our new word
             for seg in occupied_segments:
                 if min_row <= seg[-1] and max_row >= seg[0]:  # Segment overlaps with additions
-                    word = ''.join(temp_board[seg[0]:seg[-1] + 1, col])
-                    if len(word) > 1:
-                        words.add(word)
+                    main_word_positions = [(r, col) for r in range(seg[0], seg[-1] + 1)]
+                    if len(main_word_positions) > 1:
+                        words.append(main_word_positions)
                     break # since we should only get one continuous word as result of our addition
                         
             # Get cross words efficiently
@@ -295,25 +301,105 @@ class Game:
                 segment_boundaries = np.split(indices, np.where(~segment_idx)[0] + 1)
                 segment = next((seg for seg in segment_boundaries if col in seg), None)
                 if segment is not None and len(segment) > 1:
-                    word = ''.join(temp_board[positions[i, 0], segment[0]:segment[-1] + 1])
-                    words.add(word)
+                    cross_word_positions = [(positions[i, 0], c) for c in range(segment[0], segment[-1] + 1)]
+                    words.append(cross_word_positions)
                             
+        return words
+    
+    def _get_all_affected_words(self, additions: List[Tuple[str, List[int]]]) -> Set[str]:
+        """
+        Get all words formed or modified by the new letters.
+        Returns set of main word and any cross words formed.
+        Assumes additions are valid (single line, continuous, within bounds).
+        """
+        if not additions:
+            return set()
+            
+        temp_board = self.board.copy()
+        for letter, [row, col] in additions:
+            temp_board[row, col] = letter
+        
+        # Use the efficient helper to get word positions
+        word_positions = self._extract_word_positions(temp_board, additions)
+        
+        # Convert positions to actual word strings
+        words = set()
+        for pos_list in word_positions:
+            word = ''.join(temp_board[r, c] for r, c in pos_list)
+            words.add(word)
+        
         return words
     
     def _check_word_valid(self, additions: List[Tuple[str, List[int]]]) -> bool:
         """
         Check if all words formed by the additions are valid according to the dictionary.
         
+        Wildcard handling:
+        - If any letter in additions is '-', it's treated as a wildcard (blank tile).
+        - For each wildcard position, try all 26 letters (A-Z) to find valid word formations.
+        - If multiple letters make all words valid, randomly choose one.
+        - Replace the wildcard in additions (in-place) with the chosen letter in lowercase
+          so _score_calculator can score it as 0 points.
+        
         Args:
-            additions: List of (letter, [row, col]) tuples for new letters
+            additions: List of (letter, [row, col]) tuples for new letters.
+                      Modified in-place: wildcards '-' are replaced with lowercase letters.
         Returns:
-            bool: True if all words are valid, False otherwise
+            bool: True if all words are valid (possibly after wildcard resolution).
+        Raises:
+            ValueError: If no valid letter substitution exists for wildcards, or if words are invalid.
         """
-        all_words = self._get_all_affected_words(additions)
-        invalid_words = [word for word in all_words
-                         if word.lower() not in self.rule.scrabble_dictionary]
-        if len(invalid_words) > 0:
-            raise ValueError(f"Formed invalid words: {', '.join(invalid_words)}")
+        # Identify wildcard positions
+        wildcard_indices = [i for i, (ch, _) in enumerate(additions) if ch == '-']
+        
+        if not wildcard_indices:
+            # No wildcards, simple dictionary check
+            all_words = self._get_all_affected_words(additions)
+            invalid_words = [word for word in all_words
+                             if word.lower() not in self.rule.scrabble_dictionary]
+            if len(invalid_words) > 0:
+                raise ValueError(f"Formed invalid words: {', '.join(invalid_words)}")
+            return True
+        
+        # Wildcards present: exhaustively test all letter combinations
+        # Since there are at most 2 wildcards in a standard Scrabble game,
+        # we can afford to test all combinations (max 26^2 = 676 checks)
+        
+        # Generate all possible letter combinations for wildcards
+        
+        all_letter_choices = list(string.ascii_uppercase)
+        valid_combinations = []
+        
+        # Try all combinations of letters for the wildcards
+        for letter_combo in product(all_letter_choices, repeat=len(wildcard_indices)):
+            # Apply this combination to the wildcards
+            for i, wc_idx in enumerate(wildcard_indices):
+                additions[wc_idx] = (letter_combo[i], additions[wc_idx][1])
+            
+            # Check if all formed words are valid with this combination
+            try:
+                all_words = self._get_all_affected_words(additions)
+                if all(word.lower() in self.rule.scrabble_dictionary for word in all_words):
+                    # This combination works! Store it
+                    valid_combinations.append(letter_combo)
+            except:
+                # If word extraction fails, skip this combination
+                pass
+        
+        # Restore wildcards temporarily
+        for wc_idx in wildcard_indices:
+            additions[wc_idx] = ('-', additions[wc_idx][1])
+        
+        if not valid_combinations:
+            raise ValueError(f"No valid letter combination found for wildcards at positions {[additions[i][1] for i in wildcard_indices]}")
+        
+        # Randomly choose one valid combination
+        chosen_combo = random.choice(valid_combinations)
+        
+        # Apply the chosen combination with lowercase letters to signal blanks
+        for i, wc_idx in enumerate(wildcard_indices):
+            additions[wc_idx] = (chosen_combo[i].lower(), additions[wc_idx][1])
+        
         return True
     
     def _score_calculator(self, additions: List[Tuple[str, List[int]]], bingo: bool = False) -> int:
@@ -357,64 +443,8 @@ class Game:
             temp_board[r, c] = ch
             new_positions.add((r, c))
 
-        # Helper to expand from a given start to the full word horizontally/vertically
-        def expand_horizontal(r: int, c: int) -> List[Tuple[int, int]]:
-            left = c
-            while left > 0 and temp_board[r, left - 1] != '':
-                left -= 1
-            right = c
-            while right < 14 and temp_board[r, right + 1] != '':
-                right += 1
-            return [(r, cc) for cc in range(left, right + 1)]
-
-        def expand_vertical(r: int, c: int) -> List[Tuple[int, int]]:
-            top = r
-            while top > 0 and temp_board[top - 1, c] != '':
-                top -= 1
-            bottom = r
-            while bottom < 14 and temp_board[bottom + 1, c] != '':
-                bottom += 1
-            return [(rr, c) for rr in range(top, bottom + 1)]
-
-        # Determine main word orientation from additions
-        positions = [(pos[0], pos[1]) for _, pos in norm_additions]
-        rows = {r for r, _ in positions}
-        cols = {c for _, c in positions}
-
-        words: List[List[Tuple[int, int]]] = []
-        if len(rows) == 1:  # horizontal main word
-            r0 = next(iter(rows))
-            cmin = min(c for _, c in positions)
-            cmax = max(c for _, c in positions)
-            main_positions = expand_horizontal(r0, cmin)
-            if len(main_positions) > 1:
-                words.append(main_positions)
-            # Cross words for each newly placed tile (vertical expansions)
-            for _, (rr, cc) in norm_additions:
-                cross = expand_vertical(rr, cc)
-                if len(cross) > 1:
-                    words.append(cross)
-        else:  # vertical main word
-            c0 = next(iter(cols))
-            rmin = min(r for r, _ in positions)
-            rmax = max(r for r, _ in positions)
-            main_positions = expand_vertical(rmin, c0)
-            if len(main_positions) > 1:
-                words.append(main_positions)
-            # Cross words for each newly placed tile (horizontal expansions)
-            for _, (rr, cc) in norm_additions:
-                cross = expand_horizontal(rr, cc)
-                if len(cross) > 1:
-                    words.append(cross)
-
-        # Deduplicate identical words (rare but possible)
-        dedup_words: List[List[Tuple[int, int]]] = []
-        seen: Set[Tuple[Tuple[int, int], ...]] = set()
-        for w in words:
-            key = tuple(w)
-            if key not in seen:
-                seen.add(key)
-                dedup_words.append(w)
+        # Use the efficient helper to get word positions
+        word_positions = self._extract_word_positions(temp_board, norm_additions)
 
         # Multiplier grids (fallback to identity if not provided)
         wm = getattr(self.rule, 'word_multiplier', np.ones((15, 15), dtype=np.int8))
@@ -434,7 +464,7 @@ class Game:
                     letter_sum += base
             return letter_sum * word_mult
 
-        total = sum(score_word(w) for w in dedup_words)
+        total = sum(score_word(w) for w in word_positions)
         if bingo or len(norm_additions) == 7:
             total += 50
         return int(total)

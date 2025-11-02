@@ -6,12 +6,12 @@ from utils.game_state import Game
 
 class TestRule:
     def __init__(self):
-        # simple letter points for tests
-        self.letter_points = {ch: 1 for ch in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'}
+        # simple letter points for tests (uppercase keys to match input)
+        self.letter_points = {'-': 0, **{ch: 1 for ch in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'}}
         # default multipliers (no special squares)
         self.word_multiplier = np.ones((15, 15), dtype=np.int8)
         self.letter_multiplier = np.ones((15, 15), dtype=np.int8)
-        # minimal dictionary used for validation in update()
+        # minimal dictionary used for validation (lowercase for matching)
         self.scrabble_dictionary = set(['to', 'top', 'a', 'at', 'p'])
 
 
@@ -68,8 +68,9 @@ def test_update_valid_move_updates_board_and_validates_words():
     game.board[7, 6] = 'T'
     game.board[7, 7] = 'O'
     additions = [('P', [7, 8])]
-    # update should succeed because 'TOP' is in TestRule.scrabble_dictionary
-    assert game.update(additions) is True
+    # new_move should succeed because 'TOP' is in TestRule.scrabble_dictionary
+    score = game.new_move(additions)
+    assert score > 0  # Should return a positive score
     assert game.board[7, 8] == 'P'
 
 
@@ -98,13 +99,13 @@ def test_cross_word_formation():
 def test_update_rejects_invalid_dictionary_word():
     rule = TestRule()
     # remove 'TOP' from dictionary to force rejection
-    rule.scrabble_dictionary = set(['TO', 'A', 'AT', 'P'])
+    rule.scrabble_dictionary = set(['to', 'a', 'at', 'p'])
     game = Game(rule)
     game.board[7, 6] = 'T'
     game.board[7, 7] = 'O'
     additions = [('P', [7, 8])]
     with pytest.raises(ValueError):
-        game.update(additions)
+        game.new_move(additions)
 
 
 def test_check_board_valid_requires_touch():
@@ -132,13 +133,13 @@ def test_print_board_runs():
 def test_invalid_main_word_rejected():
     rule = TestRule()
     # Remove TOP so main word TOP is invalid
-    rule.scrabble_dictionary = set(['TO', 'A', 'AT', 'P'])
+    rule.scrabble_dictionary = set(['to', 'a', 'at', 'p'])
     game = Game(rule)
     game.board[7, 6] = 'T'
     game.board[7, 7] = 'O'
     additions = [('X', [7, 8])]
     with pytest.raises(ValueError):
-        game.update(additions)
+        game.new_move(additions)
 
 
 def test_cross_word_invalid_rejected():
@@ -149,9 +150,9 @@ def test_cross_word_invalid_rejected():
     # Pre-place T to form main word TO with new O at (7,8)
     game.board[7, 7] = 'T'
     additions = [('O', [7, 8])]
-    # 'TO' is valid in TestRule but 'BO' (the cross) is not, so update should raise
+    # 'TO' is valid in TestRule but 'BO' (the cross) is not, so new_move should raise
     with pytest.raises(ValueError):
-        game.update(additions)
+        game.new_move(additions)
 
 
 def test_valid_multi_letter_addition():
@@ -159,5 +160,6 @@ def test_valid_multi_letter_addition():
     game = Game(rule)
     # First move: must cover center, add 'AT' horizontally
     additions = [('A', [7, 7]), ('T', [7, 8])]
-    assert game.update(additions) is True
+    score = game.new_move(additions)
+    assert score > 0
     assert game.board[7, 7] == 'A' and game.board[7, 8] == 'T'

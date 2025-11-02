@@ -1,0 +1,8 @@
+cat
+cats
+at
+a
+dog
+dogs
+qi
+qat
