@@ -91,18 +91,18 @@ class OptimiserLength:
                 except Exception:
                     h_words = []
 
-                # Sort words by length descending - we only want the longest valid ones
+                if not h_words:
+                    continue
+
+                # Sort words by length descending - longest first
                 h_words.sort(key=len, reverse=True)
                 
-                # Find first valid word(s) of maximum length
-                max_len = None
+                # Find first valid word (which will be longest valid)
+                found_valid = False
                 for word in h_words:
-                    word_len = len(word)
-                    
-                    # If we've found valid words and this word is shorter, stop
-                    if max_len is not None and word_len < max_len:
-                        break
-                    
+                    if found_valid:
+                        break  # Already found longest valid word for this pattern
+                        
                     additions_sets = self._materialize_additions_from_words(
                         axis='H', anchor=(r, c), words=[word], meta=h_meta, rack=deck_base
                     )
@@ -110,13 +110,12 @@ class OptimiserLength:
                         try:
                             # Validate cross-words and dictionary before accepting
                             if self.game._check_word_valid(adds):
-                                if max_len is None:
-                                    max_len = word_len
-                                
                                 key = tuple((ch, pos[0], pos[1]) for ch, pos in adds)
                                 if key not in seen_additions:
                                     seen_additions.add(key)
                                     candidates.append(adds)
+                                    found_valid = True
+                                    break  # Found valid word, stop checking this word's placements
                         except (ValueError, Exception):
                             continue
 
@@ -129,28 +128,32 @@ class OptimiserLength:
                 except Exception:
                     v_words = []
 
-                valid_additions_with_len = []  # list of (len(word), additions)
+                if not v_words:
+                    continue
+
+                # Sort words by length descending - longest first
+                v_words.sort(key=len, reverse=True)
+                
+                # Find first valid word (which will be longest valid)
+                found_valid = False
                 for word in v_words:
+                    if found_valid:
+                        break  # Already found longest valid word for this pattern
+                        
                     additions_sets = self._materialize_additions_from_words(
                         axis='V', anchor=(r, c), words=[word], meta=v_meta, rack=deck_base
                     )
                     for adds in additions_sets:
                         try:
                             if self.game._check_word_valid(adds):
-                                valid_additions_with_len.append((len(word), adds))
+                                key = tuple((ch, pos[0], pos[1]) for ch, pos in adds)
+                                if key not in seen_additions:
+                                    seen_additions.add(key)
+                                    candidates.append(adds)
+                                    found_valid = True
+                                    break  # Found valid word, stop checking this word's placements
                         except (ValueError, Exception):
                             continue
-
-                if not valid_additions_with_len:
-                    continue
-
-                max_len = max(L for L, _ in valid_additions_with_len)
-                for L, adds in valid_additions_with_len:
-                    if L == max_len:
-                        key = tuple((ch, pos[0], pos[1]) for ch, pos in adds)
-                        if key not in seen_additions:
-                            seen_additions.add(key)
-                            candidates.append(adds)
 
         # If no candidates found, return empty
         if not candidates:

@@ -163,15 +163,19 @@ def test_with_blank_tile():
     for i, additions in enumerate(recommendations[:5], 1):
         word_positions = sorted(additions, key=lambda x: (x[1][0], x[1][1]))
         word = ''.join(ch.upper() for ch, _ in word_positions)  # uppercase for display
-        blanks = [ch for ch, _ in additions if ch.islower()]
+        positions = [(pos[0], pos[1]) for _, pos in word_positions]
+        blanks = [(ch, pos) for ch, pos in additions if ch.islower()]
         
         try:
             score = game.score_calculator(additions)
             print(f"\n  {i}. Word: {word}")
+            print(f"     Positions: {positions}")
             print(f"     Score: {score}")
             if blanks:
-                print(f"     Blank(s) used as: {blanks}")
+                blank_letters = ', '.join([f"{ch.upper()} at {pos}" for ch, pos in blanks])
+                print(f"     Blank(s) used as: {blank_letters}")
             print(f"     Letters placed: {len(additions)}")
+            print(f"     Full additions: {additions}")
         except Exception as e:
             print(f"\n  {i}. Error: {e}")
     
