@@ -349,6 +349,11 @@ class Game:
         Raises:
             ValueError: If no valid letter substitution exists for wildcards, or if words are invalid.
         """
+        # First check that none of the additions overlap with existing board positions
+        for _, [row, col] in additions:
+            if self.board[row, col] != '':
+                raise ValueError(f"Position ({row},{col}) is already occupied by '{self.board[row, col]}'")
+        
         # Identify wildcard positions
         wildcard_indices = [i for i, (ch, _) in enumerate(additions) if ch == '-']
         
@@ -358,7 +363,7 @@ class Game:
             invalid_words = [word for word in all_words
                              if word.lower() not in self.rule.scrabble_dictionary]
             if len(invalid_words) > 0:
-                raise ValueError(f"Formed invalid words: {', '.join(invalid_words)}")
+                raise ValueError(f"Formed invalid words: {', '.join(invalid_words)}. This fuck isn't even fucking English (My husband insisted to add this line. I apologize for his bad manners.)")
             return True
         
         # Wildcards present: exhaustively test all letter combinations
@@ -402,7 +407,7 @@ class Game:
         
         return True
     
-    def _score_calculator(self, additions: List[Tuple[str, List[int]]], bingo: bool = False) -> int:
+    def score_calculator(self, additions: List[Tuple[str, List[int]]], bingo: bool = False) -> int:
         """
         Calculate the total score for a move (main word + any cross words) according to
         Scrabble rules, using the current board and rule multipliers.
@@ -521,6 +526,6 @@ class Game:
         self._check_word_valid(additions)
         
         # If we got here, the move is valid - calculate score and update board
-        score = self._score_calculator(additions)
+        score = self.score_calculator(additions)
         self._update(additions)
         return score

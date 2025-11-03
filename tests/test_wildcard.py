@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-from utils.game_state import Game
+from utils.matrix.game_state import Game
 
 
 class WildcardRule:
