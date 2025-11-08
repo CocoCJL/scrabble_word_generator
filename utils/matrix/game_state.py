@@ -349,11 +349,6 @@ class Game:
         Raises:
             ValueError: If no valid letter substitution exists for wildcards, or if words are invalid.
         """
-        # First check that none of the additions overlap with existing board positions
-        for _, [row, col] in additions:
-            if self.board[row, col] != '':
-                raise ValueError(f"Position ({row},{col}) is already occupied by '{self.board[row, col]}'")
-        
         # Identify wildcard positions
         wildcard_indices = [i for i, (ch, _) in enumerate(additions) if ch == '-']
         

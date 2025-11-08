@@ -46,6 +46,35 @@ class OptimiserLength:
                 return matching_words
         return []
 
+    def _dedup_additions_sets(self, additions_sets):
+        """
+        Deduplicate a list of additions lists.
+
+        Each additions list is of the form: [(ch, [r, c]), ...]
+        We canonicalize by sorting placements by (r, c, ch) and building a tuple key.
+        Letter case is preserved (lowercase denotes blanks) to avoid merging
+        distinct blank vs non-blank placements.
+
+        Returns a new list preserving the first occurrence order.
+        """
+        if not additions_sets:
+            return []
+
+        unique = []
+        seen = set()
+        for adds in additions_sets:
+            try:
+                key = tuple(sorted((ch, pos[0], pos[1]) for ch, pos in adds))
+            except Exception:
+                # If an entry is malformed, skip dedup for it but keep behavior predictable
+                unique.append(adds)
+                continue
+            if key in seen:
+                continue
+            seen.add(key)
+            unique.append(adds)
+        return unique
+
     def recommend_next_move(self, deck):
         """
         Recommend next moves by generating possible words from anchors.
@@ -179,6 +208,8 @@ class OptimiserLength:
 
         # Return only the highest-scoring additions (preserve ties)
         best = [adds for score, adds in scored if score == max_score]
+        # Final safeguard: deduplicate identical additions before returning
+        best = self._dedup_additions_sets(best)
         return best
 
     def _find_anchor_positions(self):

@@ -83,3 +83,6 @@ venv.bak/
 
 # Local secrets
 *.env
+
+# Temp files
+temp/
