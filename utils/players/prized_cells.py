@@ -110,8 +110,11 @@ class OptimiserPrize:
             return []
 
         max_score = max(score for score, _ in candidates)
-        best = [adds for score, adds in candidates if score == max_score]
+        best = [(adds, score) for score, adds in candidates if score == max_score]
         # Final safeguard: deduplicate identical additions before returning
-        best = self.ol._dedup_additions_sets(best)
+        best_adds = [adds for adds, score in best]
+        deduped_adds = self.ol._dedup_additions_sets(best_adds)
+        # Rebuild tuples with scores after dedup
+        best = [(adds, max_score) for adds in deduped_adds]
         return best
     

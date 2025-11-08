@@ -207,9 +207,12 @@ class OptimiserLength:
             return []
 
         # Return only the highest-scoring additions (preserve ties)
-        best = [adds for score, adds in scored if score == max_score]
+        best = [(adds, score) for score, adds in scored if score == max_score]
         # Final safeguard: deduplicate identical additions before returning
-        best = self._dedup_additions_sets(best)
+        best_adds = [adds for adds, score in best]
+        deduped_adds = self._dedup_additions_sets(best_adds)
+        # Rebuild tuples with scores after dedup
+        best = [(adds, score) for score, adds in scored if score == max_score and adds in deduped_adds]
         return best
 
     def _find_anchor_positions(self):

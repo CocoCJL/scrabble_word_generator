@@ -22,15 +22,15 @@ PLAYERS = {
 
 
 def _print_additions(game, additions_list, limit=10, prefix=""):
+    """Print additions where each item is a tuple (adds, score)."""
     if prefix:
         print(prefix)
     print(f"  Found {len(additions_list)} move(s):")
-    for i, adds in enumerate(additions_list[:limit], 1):
+    for i, (adds, score) in enumerate(additions_list[:limit], 1):
         word_positions = sorted(adds, key=lambda x: (x[1][0], x[1][1]))
         word = ''.join(ch.upper() for ch, _ in word_positions)
         positions = [(pos[0], pos[1]) for _, pos in word_positions]
         try:
-            score = game.score_calculator(adds)
             direction = (
                 'Horizontal' if len(set(p[0] for p in positions)) == 1 else
                 'Vertical' if len(set(p[1] for p in positions)) == 1 else
@@ -84,9 +84,13 @@ def _run_players_on_case(title, setup_board_fn, deck):
                 print(f"    {i}. {w}")
             if len(rec) > 10:
                 print(f"    ... and {len(rec) - 10} more")
-        # List of additions (list of tuples)
-        elif isinstance(rec[0], list):
-            _print_additions(game, rec, limit=10, prefix=f"- {name}:")
+        # List of (additions, score) tuples
+        elif isinstance(rec[0], tuple) and len(rec[0]) == 2:
+            # rec is a list of (additions, score) tuples
+            if isinstance(rec[0][0], list):
+                _print_additions(game, rec, limit=10, prefix=f"- {name}:")
+            else:
+                print(f"- {name}: Unexpected tuple format -> {rec[0]}")
         else:
             print(f"- {name}: Unexpected output format -> {type(rec)}: {rec}")
     print()

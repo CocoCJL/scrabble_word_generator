@@ -66,13 +66,13 @@ See `sample.ipynb` for usage examples.
 
 #### Player Optimization Strategies 
 
-recommend the best next move based on the current board state and the given deck, based on different optimisation strategies
+recommend the best next move based on the current board state and the given deck, based on different optimisation strategies. due to short time allowed for the petty coding (I had to finish coding before my last online Scrabble game with my husband automatically declares my defeat due to timeout), I did not optimise the algorithms based on runtime or space efficiencies. as long as they could work as intended.
 
 **Player 1: Length Maximizer**
 - Strategy: Prioritize playing the longest possible words
 
 **Player 2: Crossword Specialist**
-- Strategy: Maximize the number of words formed per turn
+- Strategy: Prioritize playing cross words (i.e. form words in both horizontal and vertical directions)
 - Places tiles to form cross words with existing tiles
 
 **Player 3: Multiplier Optimizer**

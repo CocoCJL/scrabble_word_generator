@@ -122,7 +122,10 @@ class OptimiserCrossword:
             return []
 
         max_score = max(s for s, _ in candidates)
-        best = [adds for s, adds in candidates if s == max_score]
+        best = [(adds, s) for s, adds in candidates if s == max_score]
         # Final dedup safeguard
-        best = self.ol._dedup_additions_sets(best)
+        best_adds = [adds for adds, s in best]
+        deduped_adds = self.ol._dedup_additions_sets(best_adds)
+        # Rebuild tuples with scores after dedup
+        best = [(adds, max_score) for adds in deduped_adds]
         return best
