@@ -10,12 +10,14 @@ if ROOT not in sys.path:
 from resources.rule_definitions import Rule
 from utils.players.longest_word import OptimiserLength
 from utils.players.prized_cells import OptimiserPrize
+from utils.players.crossword import OptimiserCrossword
 from utils.matrix.game_state import Game
 
 
 PLAYERS = {
     'LongestWord': lambda rule, game: OptimiserLength(rule, game),
     'PrizeCells': lambda rule, game: OptimiserPrize(rule, game),
+    'Crossword': lambda rule, game: OptimiserCrossword(rule, game),
 }
 
 
